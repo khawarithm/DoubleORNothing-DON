@@ -2,11 +2,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Double Or Nothing ULTRA+</title><style>
+<title>Double Or Nothing ULTRA FIXED</title><style>
 body{margin:0;font-family:sans-serif;background:#0b0f14;color:white}
 
 .main{padding:15px;padding-bottom:90px}
-
 .card{background:#121821;border-radius:14px;padding:15px;margin-bottom:15px}
 
 #money{font-size:42px;font-weight:bold}
@@ -16,17 +15,35 @@ body{margin:0;font-family:sans-serif;background:#0b0f14;color:white}
 button{padding:14px;font-size:16px;border:none;border-radius:10px;background:#00ffcc;margin-top:8px;width:100%}
 input{padding:12px;font-size:16px;border:none;border-radius:8px;margin-top:8px;width:100%;background:#0f141b;color:white}
 
-/* bottom nav */
+/* bottom nav improved */
 .sidebar{
 position:fixed;
 bottom:0;
 left:0;
 width:100%;
 display:flex;
-background:#0f141b;
+background:#111827;
+border-top:1px solid #222;
 }
-.sidebar button{flex:1;border-radius:0}
-</style></head><body><div class="main"><div id="market" class="card">
+.sidebar button{
+flex:1;
+border-radius:0;
+background:none;
+color:#aaa;
+font-size:13px;
+padding:10px;
+}
+.sidebar button.active{
+color:#00ffcc;
+font-weight:bold;
+}
+
+.stats{font-size:14px;opacity:.8;margin-top:5px}
+</style></head><body><div class="main"><div class="card">
+<h3>💰 Status</h3>
+<div class="stats">Total: $<span id="total">0</span></div>
+<div class="stats">Debt: $<span id="debt">0</span></div>
+</div><div id="market" class="card">
 <h3>📈 Market</h3>
 <div id="money">$0</div>
 <input id="startInput" placeholder="Start amount">
@@ -39,7 +56,7 @@ background:#0f141b;
 </div><div id="loan" class="card" style="display:none">
 <h3>💸 Loan</h3>
 <button onclick="takeLoan()">Pinjam 100$</button>
-<input id="loanUser" placeholder="User ID">
+<input id="loanUser" placeholder="User UID">
 <input id="loanAmount" placeholder="Amount">
 <input id="loanInterest" placeholder="Interest %">
 <button onclick="requestLoan()">Request Loan</button>
@@ -52,10 +69,10 @@ background:#0f141b;
 <button onclick="login()">Login</button>
 <div id="user"></div>
 </div></div><div class="sidebar">
-<button onclick="show('market')">Market</button>
-<button onclick="show('biz')">Biz</button>
-<button onclick="show('loan')">Loan</button>
-<button onclick="show('account')">Account</button>
+<button onclick="show('market',this)" class="active">Market</button>
+<button onclick="show('biz',this)">Biz</button>
+<button onclick="show('loan',this)">Loan</button>
+<button onclick="show('account',this)">Account</button>
 </div><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
@@ -67,29 +84,34 @@ authDomain:"economy-b8b38.firebaseapp.com",
 projectId:"economy-b8b38"
 });
 
-const auth=getAuth();
-const db=getFirestore();
+const auth=getAuth(app);
+const db=getFirestore(app);
 let user=null;
 
 window.register=async()=>{
+try{
 let r=await createUserWithEmailAndPassword(auth,email.value,pass.value);
-user=r.user;userUI();saveCloud();
+user=r.user;userUI();
+}catch(e){alert(e.message)}
 }
 
 window.login=async()=>{
+try{
 let r=await signInWithEmailAndPassword(auth,email.value,pass.value);
 user=r.user;userUI();loadCloud();loadLoanRequests();
+}catch(e){alert(e.message)}
 }
 
-function userUI(){document.getElementById('user').innerText=user.uid}
+function userUI(){document.getElementById('user').innerText="UID: "+user.uid}
 
 let total=100,current=0,running=false;
-let businesses=[],loans=0;
+let businesses=[],loans=0,debt=0;
 
 function update(){
-let m=document.getElementById('money');
-m.innerText='$'+current.toFixed(2);
-m.className=current>=0?'green':'red';
+document.getElementById('money').innerText='$'+current.toFixed(2);
+document.getElementById('money').className=current>=0?'green':'red';
+document.getElementById('total').innerText=Math.floor(total);
+document.getElementById('debt').innerText=Math.floor(debt);
 renderBiz();
 }
 
@@ -118,8 +140,7 @@ update();
 
 window.cashOut=()=>{
 running=false;
-let final=current;
-total+=final;
+total+=current;
 current=0;
 update();
 saveCloud();
@@ -128,55 +149,42 @@ saveCloud();
 window.buyBusiness=()=>{
 if(total<300)return;
 total-=300;
-businesses.push({income:1,delay:60,progress:0,comfort:0});
+businesses.push({income:1,delay:60,progress:0});
 }
 
 function renderBiz(){
 let el=document.getElementById('bizList');el.innerHTML='';
 businesses.forEach((b,i)=>{
-el.innerHTML+=`<div>
-Biz ${i+1} $${b.income}
-<button onclick="upgradeComfort(${i})">Comfort</button>
-</div>`;
+el.innerHTML+=`<div>Biz ${i+1} | $${b.income}</div>`;
 })
-}
-
-window.upgradeComfort=(i)=>{
-let b=businesses[i];
-if(b.comfort>=5||total<500)return;
-total-=500;
-b.comfort++;
-}
-
-function trySuccess(b){
-if(b.comfort<3)return;
-let r=Math.random();
-if(r<0.01) b.income+=1000;
-else if(r<0.05) b.income+=100;
-else if(r<0.1) b.income+=50;
 }
 
 setInterval(()=>{
 businesses.forEach(b=>{
 b.progress++;
-if(b.progress>=b.delay){
-trySuccess(b);
-total+=b.income;
-b.progress=0;
-}
+if(b.progress>=b.delay){total+=b.income;b.progress=0}
 });
 update();
 },1000);
 
-// SYSTEM LOAN
+// LOAN SYSTEM
 window.takeLoan=()=>{
-total+=100;loans++;
-setTimeout(()=>{total-=100*(1+loans*0.05)},60000);
+total+=100;
+loans++;
+let interest=0.05 + (loans*0.05);
+let repay=100*(1+interest);
+debt+=repay;
+setTimeout(()=>{
+total-=repay;
+debt-=repay;
+update();
+},60000);
+update();
 }
 
 // PLAYER LOAN REQUEST
 window.requestLoan=async()=>{
-if(!user)return;
+if(!user)return alert("Login dulu");
 await addDoc(collection(db,'loanRequests'),{
 from:user.uid,
 to:loanUser.value,
@@ -193,18 +201,23 @@ el.innerHTML='';
 snap.forEach(docu=>{
 let d=docu.data();
 if(d.to===user.uid && d.status==='pending'){
-el.innerHTML+=`<div>
-${d.amount}$ @${d.interest}%
-<button onclick="acceptLoan('${docu.id}',${d.amount},${d.interest})">Accept</button>
-</div>`;
+el.innerHTML+=`<div>${d.amount}$ @${d.interest}%
+<button onclick="acceptLoan('${docu.id}',${d.amount},${d.interest})">Accept</button></div>`;
 }
 });
 }
 
 window.acceptLoan=async(id,amt,int)=>{
 total+=amt;
+let repay=amt*(1+int/100);
+debt+=repay;
 await updateDoc(doc(db,'loanRequests',id),{status:'accepted'});
-setTimeout(()=>{total-=amt*(1+int/100)},60000);
+setTimeout(()=>{
+total-=repay;
+debt-=repay;
+update();
+},60000);
+update();
 }
 
 async function saveCloud(){
@@ -215,11 +228,15 @@ await setDoc(doc(db,'players',user.uid),{money:total});
 async function loadCloud(){
 let d=await getDoc(doc(db,'players',user.uid));
 if(d.exists()) total=d.data().money;
+update();
 }
 
-window.show=(id)=>{
+window.show=(id,btn)=>{
 ['market','biz','loan','account'].forEach(x=>document.getElementById(x).style.display='none');
 document.getElementById(id).style.display='block';
+
+document.querySelectorAll('.sidebar button').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
 }
 
 update();
