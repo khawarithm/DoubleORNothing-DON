@@ -1,0 +1,206 @@
+<!DOCTYPE html><html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Or Nothing PRO+</title><style>
+body{margin:0;font-family:sans-serif;background:#0b0f14;color:white}
+.header{padding:15px;background:#0f141b;display:flex;justify-content:space-between}
+.container{padding:15px}
+.card{background:#121821;border-radius:12px;padding:15px;margin-bottom:15px;box-shadow:0 0 15px #000}
+#money{font-size:34px}
+.green{color:#00ff9f}
+.red{color:#ff4d4d}
+button{width:100%;padding:12px;border:none;border-radius:10px;background:#00ffcc;color:black;margin-top:10px}
+input{width:100%;padding:10px;border-radius:8px;border:none;margin-top:10px;background:#0f141b;color:white}
+.small{font-size:12px;opacity:.7}
+</style></head><body><div class="header">
+<div>💰 Total: <span id="total">10</span></div>
+<div id="level">Lv 1</div>
+</div><div class="container"><div class="card">
+<h3>📈 Market</h3>
+<div id="money">$10</div>
+<input id="startInput" type="number" placeholder="Start amount">
+<button onclick="startGame()">Start</button>
+<button onclick="cashOut()">Cash Out</button>
+</div><div class="card">
+<h3>🏢 Business</h3>
+<button onclick="buyBusiness()">Buy Business</button>
+<div id="bizList"></div>
+</div></div><script>
+let totalMoney=10,current=0,base=0,running=false;
+let xp=0,level=1,xpNeed=10;
+let businesses=[];
+let loans=0;
+
+function save(){
+localStorage.setItem("save",JSON.stringify({totalMoney,xp,level,xpNeed,businesses,loans}))
+}
+
+function load(){
+let s=localStorage.getItem("save");
+if(s){let d=JSON.parse(s);
+totalMoney=d.totalMoney;xp=d.xp;level=d.level;xpNeed=d.xpNeed;businesses=d.businesses||[];loans=d.loans||0}
+}
+
+function updateUI(){
+let m=document.getElementById("money");
+m.innerText="$"+current.toFixed(2);
+m.className=current>=0?"green":"red";
+document.getElementById("total").innerText=Math.floor(totalMoney);
+document.getElementById("level").innerText="Lv "+level;
+renderBiz();
+}
+
+function getMult(){
+let r=Math.random();
+
+// naik pelan sering
+if(r<0.45) return 1.02 + Math.random()*0.1;
+
+// turun brutal sering
+if(r<0.9) return 0.4 + Math.random()*0.4;
+
+// spike
+return Math.random()<0.5 ? 1.5+Math.random()*1 : 0.2+Math.random()*0.3;
+}
+
+setInterval(()=>{
+if(!running)return;
+let m=getMult();
+current*=m;
+
+if(current<0){
+businesses=[];
+}
+
+updateUI();
+},900);
+
+function startGame(){
+let v=parseFloat(startInput.value);
+if(!v||v<=0||v>totalMoney)return;
+
+totalMoney-=v;
+base=v;
+current=v;
+running=true;
+updateUI();
+}
+
+function cashOut(){
+running=false;
+
+totalMoney+=current;
+
+let gainXP=Math.floor(current/100);
+xp+=gainXP;
+while(xp>=xpNeed){xp-=xpNeed;level++;xpNeed+=2}
+
+current=0;
+save();
+updateUI();
+}
+
+function buyBusiness(){
+let cost=300*Math.pow(2,businesses.length);
+if(totalMoney<cost)return;
+
+totalMoney-=cost;
+businesses.push({income:1,delay:60,progress:0,emp:0,quality:0,comfort:0});
+save();updateUI();
+}
+
+function renderBiz(){
+let el=document.getElementById("bizList");el.innerHTML="";
+businesses.forEach((b,i)=>{
+
+el.innerHTML+=`<div class='small'>
+Biz ${i+1} | $${b.income}/h | delay ${b.delay}s
+<br>
+<button onclick="hire(${i})">Hire</button>
+<button onclick="quality(${i})">Quality</button>
+<button onclick="comfort(${i})">Comfort</button>
+</div>`;
+
+});
+}
+
+function hire(i){
+let b=businesses[i];
+let cost=600+(b.emp*50);
+if(totalMoney<cost)return;
+
+totalMoney-=cost;
+b.emp++;
+b.delay=Math.max(10,b.delay-5);
+save();updateUI();
+}
+
+function quality(i){
+let b=businesses[i];
+let cost=500+(b.quality*50);
+if(totalMoney<cost)return;
+
+totalMoney-=cost;
+b.quality++;
+b.income+=10;
+save();updateUI();
+}
+
+function comfort(i){
+let b=businesses[i];
+let cost=700+(b.comfort*100);
+if(totalMoney<cost||b.comfort>=5)return;
+
+totalMoney-=cost;
+b.comfort++;
+save();updateUI();
+}
+
+// SUCCESS BUSINESS SYSTEM
+function trySuccess(b){
+if(b.comfort<3)return;
+
+let chance=Math.random();
+
+if(chance<0.02){b.income+=1000}
+else if(chance<0.05){b.income+=100}
+else if(chance<0.1){b.income+=50}
+}
+
+setInterval(()=>{
+businesses.forEach(b=>{
+b.progress++;
+if(b.progress>=b.delay){
+
+trySuccess(b);
+
+// bunga pinjaman ngurangin income
+let penalty = 1 - (loans*0.05);
+if(penalty<0) penalty=0;
+
+totalMoney+=b.income*penalty;
+b.progress=0;
+}
+});
+updateUI();
+},1000);
+
+// LOAN SYSTEM
+function loan(){
+let amount=100;
+let interest=0.05 + (loans*0.05);
+
+totalMoney+=amount;
+loans++;
+
+// bunga langsung potong
+setTimeout(()=>{
+totalMoney-=amount*(1+interest);
+save();updateUI();
+},60000);
+}
+
+load();updateUI();
+</script></body>
+</html>
