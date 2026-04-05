@@ -2,67 +2,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Double Or Nothing ULTRA FIXED</title><style>
+<title>Double Or Nothing FINAL</title><style>
 body{margin:0;font-family:sans-serif;background:#0b0f14;color:white}
-
 .main{padding:15px;padding-bottom:90px}
 .card{background:#121821;border-radius:14px;padding:15px;margin-bottom:15px}
-
 #money{font-size:42px;font-weight:bold}
 .green{color:#00ff9f}
 .red{color:#ff4d4d}
-
 button{padding:14px;font-size:16px;border:none;border-radius:10px;background:#00ffcc;margin-top:8px;width:100%}
 input{padding:12px;font-size:16px;border:none;border-radius:8px;margin-top:8px;width:100%;background:#0f141b;color:white}
-
-/* bottom nav improved */
-.sidebar{
-position:fixed;
-bottom:0;
-left:0;
-width:100%;
-display:flex;
-background:#111827;
-border-top:1px solid #222;
-}
-.sidebar button{
-flex:1;
-border-radius:0;
-background:none;
-color:#aaa;
-font-size:13px;
-padding:10px;
-}
-.sidebar button.active{
-color:#00ffcc;
-font-weight:bold;
-}
-
-.stats{font-size:14px;opacity:.8;margin-top:5px}
-</style></head><body><div class="main"><div class="card">
-<h3>💰 Status</h3>
+.sidebar{position:fixed;bottom:0;left:0;width:100%;display:flex;background:#111827;border-top:1px solid #222}
+.sidebar button{flex:1;border-radius:0;background:none;color:#aaa;font-size:13px}
+.sidebar button.active{color:#00ffcc;font-weight:bold}
+.stats{font-size:14px;opacity:.8}
+</style></head><body>
+<div class="main"><div class="card">
+<h3>Status</h3>
 <div class="stats">Total: $<span id="total">0</span></div>
 <div class="stats">Debt: $<span id="debt">0</span></div>
 </div><div id="market" class="card">
-<h3>📈 Market</h3>
+<h3>Market</h3>
 <div id="money">$0</div>
 <input id="startInput" placeholder="Start amount">
 <button onclick="startGame()">Start</button>
 <button onclick="cashOut()">Cash Out</button>
 </div><div id="biz" class="card" style="display:none">
-<h3>🏢 Business</h3>
-<button onclick="buyBusiness()">Buy Business</button>
+<h3>Business</h3>
+<button onclick="buyBusiness()">Buy</button>
 <div id="bizList"></div>
 </div><div id="loan" class="card" style="display:none">
-<h3>💸 Loan</h3>
-<button onclick="takeLoan()">Pinjam 100$</button>
+<h3>Loan</h3>
+<button onclick="takeLoan()">Pinjam 100</button>
 <input id="loanUser" placeholder="User UID">
 <input id="loanAmount" placeholder="Amount">
 <input id="loanInterest" placeholder="Interest %">
 <button onclick="requestLoan()">Request Loan</button>
 <div id="loanRequests"></div>
 </div><div id="account" class="card" style="display:none">
-<h3>🔐 Account</h3>
+<h3>Account</h3>
 <input id="email" placeholder="Email">
 <input id="pass" type="password" placeholder="Password">
 <button onclick="register()">Register</button>
@@ -89,52 +66,62 @@ const db=getFirestore(app);
 let user=null;
 
 window.register=async()=>{
-try{
-let r=await createUserWithEmailAndPassword(auth,email.value,pass.value);
-user=r.user;userUI();
-}catch(e){alert(e.message)}
+try{let r=await createUserWithEmailAndPassword(auth,email.value,pass.value);user=r.user;userUI();}
+catch(e){alert(e.message)}
 }
 
 window.login=async()=>{
-try{
-let r=await signInWithEmailAndPassword(auth,email.value,pass.value);
-user=r.user;userUI();loadCloud();loadLoanRequests();
-}catch(e){alert(e.message)}
+try{let r=await signInWithEmailAndPassword(auth,email.value,pass.value);user=r.user;userUI();loadCloud();loadLoanRequests();}
+catch(e){alert(e.message)}
 }
 
-function userUI(){document.getElementById('user').innerText="UID: "+user.uid}
+function userUI(){userDiv.innerText="UID: "+user.uid}
 
-let total=100,current=0,running=false;
-let businesses=[],loans=0,debt=0;
+let total=100,current=0,running=false,debt=0,loans=0;
+let businesses=[];
+let runTime=0;
+let safeTime=3;
 
 function update(){
-document.getElementById('money').innerText='$'+current.toFixed(2);
-document.getElementById('money').className=current>=0?'green':'red';
-document.getElementById('total').innerText=Math.floor(total);
-document.getElementById('debt').innerText=Math.floor(debt);
+money.innerText='$'+current.toFixed(2);
+money.className=current>=0?'green':'red';
+totalEl.innerText=Math.floor(total);
+debtEl.innerText=Math.floor(debt);
 renderBiz();
 }
 
 function getMult(){
 let r=Math.random();
-if(r<0.55) return 1.02 + Math.random()*0.06;
-if(r<0.85) return 0.85 + Math.random()*0.1;
-return Math.random()<0.5?1.5:0.4;
+if(r<0.5) return 1.04 + Math.random()*0.06;
+if(r<0.8) return 0.92 + Math.random()*0.06;
+if(r<0.9) return 1.6 + Math.random()*0.6;
+return 0.5 + Math.random()*0.2;
 }
 
 setInterval(()=>{
 if(!running)return;
-current*=getMult();
+runTime++;
+let m=getMult();
+
+if(safeTime>0 && m<1){m=1;safeTime--}
+
+if(runTime>10 && Math.random()<(runTime*0.01)){
+m=0.3;
+}
+
+current*=m;
 if(current<0) businesses=[];
 update();
-},900);
+},1200);
 
 window.startGame=()=>{
 let v=parseFloat(startInput.value);
-if(!v||v>total)return;
+if(!v||v>total||total<=0)return alert("Ga cukup duit");
 total-=v;
 current=v;
 running=true;
+runTime=0;
+safeTime=3;
 update();
 }
 
@@ -142,6 +129,7 @@ window.cashOut=()=>{
 running=false;
 total+=current;
 current=0;
+if(total<0){debt+=Math.abs(total);total=0}
 update();
 saveCloud();
 }
@@ -149,60 +137,70 @@ saveCloud();
 window.buyBusiness=()=>{
 if(total<300)return;
 total-=300;
-businesses.push({income:1,delay:60,progress:0});
+businesses.push({income:1,delay:60,progress:0,comfort:0});
 }
 
 function renderBiz(){
-let el=document.getElementById('bizList');el.innerHTML='';
+bizList.innerHTML='';
 businesses.forEach((b,i)=>{
-el.innerHTML+=`<div>Biz ${i+1} | $${b.income}</div>`;
+bizList.innerHTML+=`<div>Biz ${i+1} $${b.income}
+<button onclick="upgradeComfort(${i})">Comfort</button></div>`;
 })
+}
+
+window.upgradeComfort=(i)=>{
+let b=businesses[i];
+if(b.comfort>=5||total<500)return;
+total-=500;
+b.comfort++;
+}
+
+function trySuccess(b){
+if(b.comfort<3)return;
+let r=Math.random();
+if(r<0.01)b.income+=1000;
+else if(r<0.05)b.income+=100;
+else if(r<0.1)b.income+=50;
 }
 
 setInterval(()=>{
 businesses.forEach(b=>{
 b.progress++;
-if(b.progress>=b.delay){total+=b.income;b.progress=0}
+if(b.progress>=b.delay){trySuccess(b);total+=b.income;b.progress=0}
 });
 update();
 },1000);
 
-// LOAN SYSTEM
 window.takeLoan=()=>{
 total+=100;
 loans++;
-let interest=0.05 + (loans*0.05);
+let interest=0.05+(loans*0.05);
 let repay=100*(1+interest);
 debt+=repay;
 setTimeout(()=>{
-total-=repay;
+if(total>=repay){total-=repay}
+else{let sisa=repay-total;total=0;debt+=sisa}
 debt-=repay;
 update();
 },60000);
 update();
 }
 
-// PLAYER LOAN REQUEST
 window.requestLoan=async()=>{
 if(!user)return alert("Login dulu");
 await addDoc(collection(db,'loanRequests'),{
-from:user.uid,
-to:loanUser.value,
-amount:parseFloat(loanAmount.value),
-interest:parseFloat(loanInterest.value),
-status:'pending'
+from:user.uid,to:loanUser.value,amount:parseFloat(loanAmount.value),interest:parseFloat(loanInterest.value),status:'pending'
 });
 }
 
 async function loadLoanRequests(){
 let snap=await getDocs(collection(db,'loanRequests'));
-let el=document.getElementById('loanRequests');
-el.innerHTML='';
-snap.forEach(docu=>{
-let d=docu.data();
-if(d.to===user.uid && d.status==='pending'){
-el.innerHTML+=`<div>${d.amount}$ @${d.interest}%
-<button onclick="acceptLoan('${docu.id}',${d.amount},${d.interest})">Accept</button></div>`;
+loanRequests.innerHTML='';
+snap.forEach(d=>{
+let x=d.data();
+if(x.to===user.uid && x.status==='pending'){
+loanRequests.innerHTML+=`<div>${x.amount}$ @${x.interest}%
+<button onclick="acceptLoan('${d.id}',${x.amount},${x.interest})">Accept</button></div>`;
 }
 });
 }
@@ -213,7 +211,8 @@ let repay=amt*(1+int/100);
 debt+=repay;
 await updateDoc(doc(db,'loanRequests',id),{status:'accepted'});
 setTimeout(()=>{
-total-=repay;
+if(total>=repay){total-=repay}
+else{let sisa=repay-total;total=0;debt+=sisa}
 debt-=repay;
 update();
 },60000);
@@ -234,10 +233,15 @@ update();
 window.show=(id,btn)=>{
 ['market','biz','loan','account'].forEach(x=>document.getElementById(x).style.display='none');
 document.getElementById(id).style.display='block';
-
 document.querySelectorAll('.sidebar button').forEach(b=>b.classList.remove('active'));
 btn.classList.add('active');
 }
+
+const money=document.getElementById('money');
+const totalEl=document.getElementById('total');
+const debtEl=document.getElementById('debt');
+const bizList=document.getElementById('bizList');
+const userDiv=document.getElementById('user');
 
 update();
 </script></body>
