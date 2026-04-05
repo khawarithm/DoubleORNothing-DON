@@ -2,24 +2,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Double Or Nothing ULTRA</title><style>
-body{margin:0;font-family:sans-serif;background:#0b0f14;color:white;display:flex}
-.sidebar{width:220px;background:#0f141b;height:100vh;padding:15px}
-.sidebar button{width:100%;margin-bottom:10px}
-.main{flex:1;padding:15px}
-.card{background:#121821;border-radius:12px;padding:15px;margin-bottom:15px}
+<title>Double Or Nothing ULTRA+</title><style>
+body{margin:0;font-family:sans-serif;background:#0b0f14;color:white}
+
+.main{padding:15px;padding-bottom:90px}
+
+.card{background:#121821;border-radius:14px;padding:15px;margin-bottom:15px}
+
+#money{font-size:42px;font-weight:bold}
 .green{color:#00ff9f}
 .red{color:#ff4d4d}
-button{padding:10px;border:none;border-radius:8px;background:#00ffcc}
-input{width:100%;padding:8px;margin-top:5px;background:#0f141b;color:white;border:none}
-</style></head>
-<body><div class="sidebar">
-<h3>Menu</h3>
-<button onclick="show('market')">Market</button>
-<button onclick="show('biz')">Business</button>
-<button onclick="show('loan')">Loan</button>
-<button onclick="show('account')">Account</button>
-</div><div class="main"><div id="market" class="card">
+
+button{padding:14px;font-size:16px;border:none;border-radius:10px;background:#00ffcc;margin-top:8px;width:100%}
+input{padding:12px;font-size:16px;border:none;border-radius:8px;margin-top:8px;width:100%;background:#0f141b;color:white}
+
+/* bottom nav */
+.sidebar{
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+display:flex;
+background:#0f141b;
+}
+.sidebar button{flex:1;border-radius:0}
+</style></head><body><div class="main"><div id="market" class="card">
 <h3>📈 Market</h3>
 <div id="money">$0</div>
 <input id="startInput" placeholder="Start amount">
@@ -27,15 +34,16 @@ input{width:100%;padding:8px;margin-top:5px;background:#0f141b;color:white;borde
 <button onclick="cashOut()">Cash Out</button>
 </div><div id="biz" class="card" style="display:none">
 <h3>🏢 Business</h3>
-<button onclick="buyBusiness()">Buy</button>
+<button onclick="buyBusiness()">Buy Business</button>
 <div id="bizList"></div>
 </div><div id="loan" class="card" style="display:none">
 <h3>💸 Loan</h3>
-<button onclick="takeLoan()">Loan 100$</button>
+<button onclick="takeLoan()">Pinjam 100$</button>
 <input id="loanUser" placeholder="User ID">
 <input id="loanAmount" placeholder="Amount">
 <input id="loanInterest" placeholder="Interest %">
-<button onclick="lendUser()">Lend to User</button>
+<button onclick="requestLoan()">Request Loan</button>
+<div id="loanRequests"></div>
 </div><div id="account" class="card" style="display:none">
 <h3>🔐 Account</h3>
 <input id="email" placeholder="Email">
@@ -43,10 +51,15 @@ input{width:100%;padding:8px;margin-top:5px;background:#0f141b;color:white;borde
 <button onclick="register()">Register</button>
 <button onclick="login()">Login</button>
 <div id="user"></div>
-</div></div><script type="module">
+</div></div><div class="sidebar">
+<button onclick="show('market')">Market</button>
+<button onclick="show('biz')">Biz</button>
+<button onclick="show('loan')">Loan</button>
+<button onclick="show('account')">Account</button>
+</div><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const app = initializeApp({
 apiKey:"AIzaSyApg3_-4YcixNHlUQ8lKDs2RFzNpvNGbUE",
@@ -65,7 +78,7 @@ user=r.user;userUI();saveCloud();
 
 window.login=async()=>{
 let r=await signInWithEmailAndPassword(auth,email.value,pass.value);
-user=r.user;userUI();loadCloud();
+user=r.user;userUI();loadCloud();loadLoanRequests();
 }
 
 function userUI(){document.getElementById('user').innerText=user.uid}
@@ -82,9 +95,9 @@ renderBiz();
 
 function getMult(){
 let r=Math.random();
-if(r<0.45) return 1.03;
-if(r<0.9) return 0.5+Math.random()*0.3;
-return Math.random()<0.5?1.6:0.3;
+if(r<0.55) return 1.02 + Math.random()*0.06;
+if(r<0.85) return 0.85 + Math.random()*0.1;
+return Math.random()<0.5?1.5:0.4;
 }
 
 setInterval(()=>{
@@ -97,48 +110,101 @@ update();
 window.startGame=()=>{
 let v=parseFloat(startInput.value);
 if(!v||v>total)return;
-total-=v;current=v;running=true;
+total-=v;
+current=v;
+running=true;
+update();
 }
 
 window.cashOut=()=>{
 running=false;
-total+=current;current=0;update();saveCloud();
+let final=current;
+total+=final;
+current=0;
+update();
+saveCloud();
 }
 
 window.buyBusiness=()=>{
 if(total<300)return;
 total-=300;
-businesses.push({income:1,delay:60,progress:0});
+businesses.push({income:1,delay:60,progress:0,comfort:0});
 }
 
 function renderBiz(){
 let el=document.getElementById('bizList');el.innerHTML='';
 businesses.forEach((b,i)=>{
-el.innerHTML+=`<div>Biz ${i+1} $${b.income}</div>`;
+el.innerHTML+=`<div>
+Biz ${i+1} $${b.income}
+<button onclick="upgradeComfort(${i})">Comfort</button>
+</div>`;
 })
+}
+
+window.upgradeComfort=(i)=>{
+let b=businesses[i];
+if(b.comfort>=5||total<500)return;
+total-=500;
+b.comfort++;
+}
+
+function trySuccess(b){
+if(b.comfort<3)return;
+let r=Math.random();
+if(r<0.01) b.income+=1000;
+else if(r<0.05) b.income+=100;
+else if(r<0.1) b.income+=50;
 }
 
 setInterval(()=>{
 businesses.forEach(b=>{
 b.progress++;
-if(b.progress>=b.delay){total+=b.income;b.progress=0}
-})
+if(b.progress>=b.delay){
+trySuccess(b);
+total+=b.income;
+b.progress=0;
+}
+});
 update();
 },1000);
 
-// loan system
+// SYSTEM LOAN
 window.takeLoan=()=>{
 total+=100;loans++;
 setTimeout(()=>{total-=100*(1+loans*0.05)},60000);
 }
 
-// lend to user
-window.lendUser=async()=>{
+// PLAYER LOAN REQUEST
+window.requestLoan=async()=>{
 if(!user)return;
-let uid=loanUser.value;
-let amt=parseFloat(loanAmount.value);
-let int=parseFloat(loanInterest.value);
-await setDoc(doc(db,'loans',uid),{amount:amt,interest:int});
+await addDoc(collection(db,'loanRequests'),{
+from:user.uid,
+to:loanUser.value,
+amount:parseFloat(loanAmount.value),
+interest:parseFloat(loanInterest.value),
+status:'pending'
+});
+}
+
+async function loadLoanRequests(){
+let snap=await getDocs(collection(db,'loanRequests'));
+let el=document.getElementById('loanRequests');
+el.innerHTML='';
+snap.forEach(docu=>{
+let d=docu.data();
+if(d.to===user.uid && d.status==='pending'){
+el.innerHTML+=`<div>
+${d.amount}$ @${d.interest}%
+<button onclick="acceptLoan('${docu.id}',${d.amount},${d.interest})">Accept</button>
+</div>`;
+}
+});
+}
+
+window.acceptLoan=async(id,amt,int)=>{
+total+=amt;
+await updateDoc(doc(db,'loanRequests',id),{status:'accepted'});
+setTimeout(()=>{total-=amt*(1+int/100)},60000);
 }
 
 async function saveCloud(){
